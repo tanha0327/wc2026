@@ -3,6 +3,8 @@ import { getAdminDb } from '@/lib/firebase-admin'
 import { Prediction, PredictionVersion, isTournamentStarted, TOURNAMENT_START } from '@/lib/data'
 import { nanoid } from 'nanoid'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const db = getAdminDb()
   const snap = await db.collection('predictions').orderBy('createdAt', 'asc').get()

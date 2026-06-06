@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES } from '@/lib/data'
+import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByAtoD, sortTeamsByGroupOrder } from '@/lib/data'
 
 const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
 const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
@@ -13,12 +13,21 @@ export default function Home() {
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
   const [scorer, setScorer] = useState({ name:'', goals: 0 })
   const [loading, setLoading] = useState(false)
+  const [teams, setTeams] = useState<string[]>(() => sortTeamsByGroupOrder(TEAMS))
   const [toast, setToast]   = useState<{type:'ok'|'err'|'lock', msg:string}|null>(null)
+  const groupedTeams = groupTeamsByAtoD(teams)
   const scorerCandidates = [...JAPAN_SCORER_CANDIDATES, ...SCORER_CANDIDATES]
   const [done, setDone]     = useState(false)
 
   const setScore = (m: 'j1'|'j2'|'j3', idx: 0|1, v: string) =>
     setScores(s => ({ ...s, [m]: s[m].map((x,i) => i===idx ? Math.max(0,parseInt(v)||0) : x) as [number,number] }))
+
+  useEffect(() => {
+    fetch('/api/teams')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => Array.isArray(data.teams) && setTeams(sortTeamsByGroupOrder(data.teams)))
+      .catch(() => {})
+  }, [])
 
   const showToast = (type: 'ok'|'err'|'lock', msg: string) => {
     setToast({type, msg})
@@ -114,7 +123,11 @@ export default function Home() {
                 <span className="rank-emoji">{e}</span>
                 <select value={rankings[k]} onChange={ev=>setRankings(r=>({...r,[k]:ev.target.value}))} disabled={locked}>
                   <option value="">選択</option>
-                  {TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                  {groupedTeams.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.teams.map(t => <option key={t} value={t}>{t}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             ))}

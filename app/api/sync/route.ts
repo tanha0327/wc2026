@@ -3,6 +3,8 @@ import { getAdminDb } from '@/lib/firebase-admin'
 import { fetchWCResults } from '@/lib/football-api'
 import { ActualResults, isTournamentStarted } from '@/lib/data'
 
+export const dynamic = 'force-dynamic'
+
 const DOC_PATH = 'meta/results'
 
 export async function GET() {

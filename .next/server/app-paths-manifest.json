@@ -1,0 +1,8 @@
+{
+  "/page": "app/page.js",
+  "/predict/[id]/page": "app/predict/[id]/page.js",
+  "/api/predictions/route": "app/api/predictions/route.js",
+  "/api/teams/route": "app/api/teams/route.js",
+  "/api/results/route": "app/api/results/route.js",
+  "/ranking/page": "app/ranking/page.js"
+}

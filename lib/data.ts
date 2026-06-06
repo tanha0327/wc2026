@@ -46,6 +46,38 @@ export const TEAMS = [
   'ウズベキスタン', 'キュラソー',
 ]
 
+export type TeamGroupLabel = 'A' | 'B' | 'C' | 'D'
+export interface TeamGroup {
+  label: string
+  teams: string[]
+}
+
+export function sortTeamsByGroupOrder(teams: string[]): string[] {
+  return [...teams].sort((a, b) => a.localeCompare(b, 'ja'))
+}
+
+export function groupTeamsByAtoD(teams: string[]): TeamGroup[] {
+  const sorted = sortTeamsByGroupOrder(teams)
+  const groupCount = 4
+  const baseSize = Math.floor(sorted.length / groupCount)
+  const remainder = sorted.length % groupCount
+  const labels: TeamGroupLabel[] = ['A', 'B', 'C', 'D']
+
+  const groups: TeamGroup[] = []
+  let start = 0
+
+  for (let i = 0; i < groupCount; i++) {
+    const size = baseSize + (i < remainder ? 1 : 0)
+    const groupTeams = sorted.slice(start, start + size)
+    start += size
+    if (groupTeams.length > 0) {
+      groups.push({ label: `グループ${labels[i]}`, teams: groupTeams })
+    }
+  }
+
+  return groups
+}
+
 // ── 大会開始日 ────────────────────────────────────────────
 export const TOURNAMENT_START = new Date(
   process.env.TOURNAMENT_START_ISO || '2026-06-11T03:00:00.000Z'
