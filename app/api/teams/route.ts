@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAdminDb } from '@/lib/firebase-admin'
-import { TEAMS } from '@/lib/data'
+import { TEAMS, orderTeamsByGroupDefinition } from '@/lib/data'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +16,14 @@ export async function GET() {
   }
 
   const data = doc.data() as { teams?: string[] }
-  if (!data?.teams?.length) {
+  const teams = Array.isArray(data?.teams) ? orderTeamsByGroupDefinition(data.teams) : []
+
+  const needsReset = !teams.length || teams.length !== TEAMS.length || TEAMS.some(team => !teams.includes(team))
+  if (needsReset) {
     const payload = { teams: TEAMS, updatedAt: new Date().toISOString() }
     await docRef.set(payload)
     return NextResponse.json(payload)
   }
 
-  return NextResponse.json({ teams: data.teams })
+  return NextResponse.json({ teams })
 }

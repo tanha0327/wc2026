@@ -79,7 +79,7 @@ export function groupTeamsByDefinition(teams: string[]): TeamGroup[] {
     label: group.label,
     teams: group.teams.filter(team => teamSet.has(team)),
   }))
-})
+}
 
 // ── 大会開始日 ────────────────────────────────────────────
 export const TOURNAMENT_START = new Date(
