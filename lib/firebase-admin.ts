@@ -4,6 +4,15 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore'
 let adminApp: App
 let adminDb: Firestore
 
+function normalizePrivateKey(raw?: string): string | undefined {
+  if (!raw) return undefined
+  let key = raw.replace(/\\n/g, '\n').trim()
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim()
+  }
+  return key
+}
+
 function getAdminApp(): App {
   if (!adminApp) {
     if (getApps().length > 0) {
@@ -13,8 +22,7 @@ function getAdminApp(): App {
         credential: cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          // Vercelの環境変数は改行が\\nになるので変換
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY),
         }),
       })
     }
