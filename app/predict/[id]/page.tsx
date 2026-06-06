@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByAtoD, sortTeamsByGroupOrder } from '@/lib/data'
+import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition } from '@/lib/data'
 
 const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
 const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
@@ -19,9 +19,9 @@ export default function PredictDetailPage() {
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
   const [scorer,   setScorer]   = useState({ name:'', goals: 0 })
   const [saving,   setSaving]   = useState(false)
-  const [teams,     setTeams]     = useState<string[]>(() => sortTeamsByGroupOrder(TEAMS))
+  const [teams,     setTeams]     = useState<string[]>(() => TEAMS)
   const scorerCandidates = [...JAPAN_SCORER_CANDIDATES, ...SCORER_CANDIDATES]
-  const groupedTeams = groupTeamsByAtoD(teams)
+  const groupedTeams = groupTeamsByDefinition(teams)
   const [toast,    setToast]    = useState<{type:'ok'|'err'|'lock', msg:string}|null>(null)
 
   const locked = isLocked()
@@ -33,7 +33,7 @@ export default function PredictDetailPage() {
   useEffect(() => {
     fetch('/api/teams')
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => Array.isArray(data.teams) && setTeams(sortTeamsByGroupOrder(data.teams)))
+      .then(data => Array.isArray(data.teams) && setTeams(orderTeamsByGroupDefinition(data.teams)))
       .catch(() => {})
   }, [])
 

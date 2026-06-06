@@ -32,51 +32,54 @@ export const JAPAN_MATCHES = [
   },
 ]
 
-export const TEAMS = [
-  'アルゼンチン', 'オーストラリア', 'オーストリア', 'ベルギー',
-  'ボスニア・ヘルツェゴビナ', 'ブラジル', 'カナダ', 'コロンビア',
-  'クロアチア', 'チェコ', 'デンマーク', 'エクアドル',
-  'エジプト', 'イングランド', 'フランス', 'ドイツ',
-  'ハイチ', 'イラン', 'イラク', '日本',
-  '韓国', 'メキシコ', 'モロッコ', 'オランダ',
-  'ニュージーランド', 'ノルウェー', 'パナマ', 'ポルトガル',
-  'カタール', 'サウジアラビア', 'セネガル', 'スコットランド',
-  'スペイン', 'スウェーデン', 'スイス', 'チュニジア',
-  'トルコ', 'ウクライナ', 'アメリカ', 'ウルグアイ',
-  'ウズベキスタン', 'キュラソー',
-]
+export type TeamGroupLabel =
+  | 'A' | 'B' | 'C' | 'D'
+  | 'E' | 'F' | 'G' | 'H'
+  | 'I' | 'J' | 'K' | 'L'
 
-export type TeamGroupLabel = 'A' | 'B' | 'C' | 'D'
 export interface TeamGroup {
   label: string
   teams: string[]
 }
 
-export function sortTeamsByGroupOrder(teams: string[]): string[] {
-  return [...teams].sort((a, b) => a.localeCompare(b, 'ja'))
+export const GROUPED_TEAMS: TeamGroup[] = [
+  { label: 'グループA', teams: ['メキシコ', '南アフリカ', '韓国', 'チェコ'] },
+  { label: 'グループB', teams: ['カナダ', 'ボスニア・ヘルツェゴビナ', 'カタール', 'スイス'] },
+  { label: 'グループC', teams: ['ブラジル', 'モロッコ', 'ハイチ', 'スコットランド'] },
+  { label: 'グループD', teams: ['アメリカ', 'パラグアイ', 'オーストラリア', 'トルコ'] },
+  { label: 'グループE', teams: ['ドイツ', 'キュラソー', 'コートジボワール', 'エクアドル'] },
+  { label: 'グループF', teams: ['オランダ', '日本', 'スウェーデン', 'チュニジア'] },
+  { label: 'グループG', teams: ['ベルギー', 'エジプト', 'イラン', 'ニュージーランド'] },
+  { label: 'グループH', teams: ['スペイン', 'カーボベルデ', 'サウジアラビア', 'ウルグアイ'] },
+  { label: 'グループI', teams: ['フランス', 'セネガル', 'イラク', 'ノルウェー'] },
+  { label: 'グループJ', teams: ['アルゼンチン', 'アルジェリア', 'オーストリア', 'ヨルダン'] },
+  { label: 'グループK', teams: ['ポルトガル', 'コンゴ民主共和国', 'ウズベキスタン', 'コロンビア'] },
+  { label: 'グループL', teams: ['イングランド', 'クロアチア', 'ガーナ', 'パナマ'] },
+]
+
+export const TEAMS = GROUPED_TEAMS.flatMap(group => group.teams)
+
+const TEAM_ORDER: Record<string, number> = TEAMS.reduce((acc, team, index) => {
+  acc[team] = index
+  return acc
+}, {} as Record<string, number>)
+
+export function orderTeamsByGroupDefinition(teams: string[]): string[] {
+  return [...teams].sort((a, b) => {
+    const aIndex = TEAM_ORDER[a] ?? Number.MAX_SAFE_INTEGER
+    const bIndex = TEAM_ORDER[b] ?? Number.MAX_SAFE_INTEGER
+    if (aIndex !== bIndex) return aIndex - bIndex
+    return a.localeCompare(b, 'ja')
+  })
 }
 
-export function groupTeamsByAtoD(teams: string[]): TeamGroup[] {
-  const sorted = sortTeamsByGroupOrder(teams)
-  const groupCount = 4
-  const baseSize = Math.floor(sorted.length / groupCount)
-  const remainder = sorted.length % groupCount
-  const labels: TeamGroupLabel[] = ['A', 'B', 'C', 'D']
-
-  const groups: TeamGroup[] = []
-  let start = 0
-
-  for (let i = 0; i < groupCount; i++) {
-    const size = baseSize + (i < remainder ? 1 : 0)
-    const groupTeams = sorted.slice(start, start + size)
-    start += size
-    if (groupTeams.length > 0) {
-      groups.push({ label: `グループ${labels[i]}`, teams: groupTeams })
-    }
-  }
-
-  return groups
-}
+export function groupTeamsByDefinition(teams: string[]): TeamGroup[] {
+  const teamSet = new Set(teams)
+  return GROUPED_TEAMS.map(group => ({
+    label: group.label,
+    teams: group.teams.filter(team => teamSet.has(team)),
+  }))
+})
 
 // ── 大会開始日 ────────────────────────────────────────────
 export const TOURNAMENT_START = new Date(
