@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted } from '@/lib/data'
+import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted, normalizeScoreInput } from '@/lib/data'
 
 export default function Home() {
   const locked = isTournamentStarted()
@@ -16,8 +16,13 @@ export default function Home() {
   const scorerCandidates = [...JAPAN_SCORER_CANDIDATES, ...SCORER_CANDIDATES]
   const [done, setDone]     = useState(false)
 
-  const setScore = (m: 'j1'|'j2'|'j3', idx: 0|1, v: string) =>
-    setScores(s => ({ ...s, [m]: s[m].map((x,i) => i===idx ? Math.max(0,parseInt(v)||0) : x) as [number,number] }))
+  const setScore = (m: 'j1'|'j2'|'j3', idx: 0|1, v: string) => {
+    const normalized = normalizeScoreInput(v)
+    setScores(s => ({
+      ...s,
+      [m]: s[m].map((x, i) => i === idx ? Math.min(20, Math.max(0, Number(normalized) || 0)) : x) as [number, number],
+    }))
+  }
 
   useEffect(() => {
     fetch('/api/teams')
@@ -100,9 +105,9 @@ export default function Home() {
               <div className="match-row" key={m.id}>
                 <span className="match-date">{m.date}</span>
                 <span className="t-japan">日本</span>
-                <input className="score-in" type="number" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} disabled={locked} />
+                <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} disabled={locked} />
                 <span className="score-sep">—</span>
-                <input className="score-in" type="number" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} disabled={locked} />
+                <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} disabled={locked} />
                 <span className="t-opp">{m.opponent}</span>
               </div>
             )

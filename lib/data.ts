@@ -90,6 +90,12 @@ export function isTournamentStarted(): boolean {
   return new Date() >= TOURNAMENT_START
 }
 
+export function normalizeScoreInput(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return '0'
+  return digits.replace(/^0+(?=\d)/, '') || '0'
+}
+
 // ── 型定義 ────────────────────────────────────────────────
 export interface ScoreData {
   japan: number
