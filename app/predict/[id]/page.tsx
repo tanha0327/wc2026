@@ -2,10 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition } from '@/lib/data'
-
-const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
-const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
+import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted } from '@/lib/data'
 
 export default function PredictDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,7 +21,7 @@ export default function PredictDetailPage() {
   const groupedTeams = groupTeamsByDefinition(teams)
   const [toast,    setToast]    = useState<{type:'ok'|'err'|'lock', msg:string}|null>(null)
 
-  const locked = isLocked()
+  const locked = isTournamentStarted()
 
   const showToast = (type: 'ok'|'err'|'lock', msg: string) => {
     setToast({type,msg}); setTimeout(()=>setToast(null), 4000)

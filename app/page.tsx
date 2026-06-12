@@ -1,13 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition } from '@/lib/data'
-
-const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
-const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
+import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted } from '@/lib/data'
 
 export default function Home() {
-  const locked = isLocked()
+  const locked = isTournamentStarted()
   const [name, setName]     = useState('')
   const [scores, setScores] = useState({ j1:[0,0] as [number,number], j2:[0,0] as [number,number], j3:[0,0] as [number,number] })
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
