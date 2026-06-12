@@ -9,7 +9,7 @@ const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
 export default function Home() {
   const locked = isLocked()
   const [name, setName]     = useState('')
-  const [scores, setScores] = useState({ j1:[2,1] as [number,number], j2:[1,1] as [number,number], j3:[2,0] as [number,number] })
+  const [scores, setScores] = useState({ j1:[0,0] as [number,number], j2:[0,0] as [number,number], j3:[0,0] as [number,number] })
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
   const [scorer, setScorer] = useState({ name:'', goals: 0 })
   const [loading, setLoading] = useState(false)
