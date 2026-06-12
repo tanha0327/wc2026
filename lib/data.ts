@@ -83,7 +83,7 @@ export function groupTeamsByDefinition(teams: string[]): TeamGroup[] {
 
 // ── 大会開始日 ────────────────────────────────────────────
 export const TOURNAMENT_START = new Date(
-  process.env.TOURNAMENT_START_ISO || '2026-06-11T03:00:00.000Z'
+  process.env.TOURNAMENT_START_ISO || '2100-01-01T00:00:00.000Z'
 )
 
 export function isTournamentStarted(): boolean {
