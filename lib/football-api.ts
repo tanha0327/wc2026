@@ -2,6 +2,7 @@ import { ActualResults, JAPAN_MATCHES } from './data'
 
 const BASE = 'https://api.football-data.org/v4'
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY || ''
+const YAHOO_SCORER_URL = 'https://soccer.yahoo.co.jp/wcup/category/2026/stats?gk=18'
 
 // football-data.org の 2026 W杯 competition id
 // 大会前は id=2000 (FIFA World Cup) で取得できる
@@ -102,6 +103,58 @@ function toJa(en: string): string {
   return TEAM_EN_JA[en] || en
 }
 
+function decodeHtml(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+async function fetchYahooScorers(): Promise<Array<{ name: string; goals: number }>> {
+  try {
+    const res = await fetch(YAHOO_SCORER_URL, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 0 },
+    })
+
+    if (!res.ok) return []
+
+    const html = await res.text()
+    const rows = Array.from(html.matchAll(/<tr class="sc-tableStats__row">[\s\S]*?<\/tr>/gi))
+
+    const scorers = rows
+      .map((match) => {
+        const row = match[0]
+        const nameMatch = row.match(/class="sc-tableStats__data sc-tableStats__data--name">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i)
+        const cells = Array.from(row.matchAll(/<td class="sc-tableStats__data(?: [^\"]*)?">([\s\S]*?)<\/td>/gi))
+        const goals = Number.parseInt(decodeHtml(cells[4]?.[1] || '0').replace(/[^0-9-]/g, ''), 10) || 0
+        const name = nameMatch ? decodeHtml(nameMatch[1]) : ''
+
+        return name && goals > 0 ? { name, goals } : null
+      })
+      .filter((item): item is { name: string; goals: number } => Boolean(item))
+
+    const unique = new Map<string, { name: string; goals: number }>()
+    scorers.forEach(item => {
+      const key = item.name.replace(/\s+/g, '').toLowerCase()
+      const existing = unique.get(key)
+      if (!existing || item.goals > existing.goals) unique.set(key, item)
+    })
+
+    return [...unique.values()].sort((a, b) => b.goals - a.goals)
+  } catch (err) {
+    console.error('[fetchYahooScorers] error:', err)
+    return []
+  }
+}
+
 export async function fetchWCResults(): Promise<Partial<ActualResults>> {
   const result: Partial<ActualResults> = {
     matches: {},
@@ -200,22 +253,31 @@ export async function fetchWCResults(): Promise<Partial<ActualResults>> {
       }
     }
 
-    // ④ 得点王
-    const scorerRes = await fetch(
-      `${BASE}/competitions/${WC_ID}/scorers?limit=100`,
-      { headers, next: { revalidate: 0 } }
-    )
-    if (scorerRes.ok) {
-      const data: FDScorers = await scorerRes.json()
-      if (data.scorers?.length > 0) {
-        result.scorer = {
-          name: data.scorers[0].player.name,
-          goals: data.scorers[0].goals,
+    // ④ 得点王（Yahoo 個人成績ページを優先）
+    const yahooScorers = await fetchYahooScorers()
+    if (yahooScorers.length > 0) {
+      result.scorer = {
+        name: yahooScorers[0].name,
+        goals: yahooScorers[0].goals,
+      }
+      result.scorers = yahooScorers
+    } else {
+      const scorerRes = await fetch(
+        `${BASE}/competitions/${WC_ID}/scorers?limit=100`,
+        { headers, next: { revalidate: 0 } }
+      )
+      if (scorerRes.ok) {
+        const data: FDScorers = await scorerRes.json()
+        if (data.scorers?.length > 0) {
+          result.scorer = {
+            name: data.scorers[0].player.name,
+            goals: data.scorers[0].goals,
+          }
+          result.scorers = data.scorers.map(s => ({
+            name: s.player.name,
+            goals: s.goals,
+          }))
         }
-        result.scorers = data.scorers.map(s => ({
-          name: s.player.name,
-          goals: s.goals,
-        }))
       }
     }
   } catch (err) {

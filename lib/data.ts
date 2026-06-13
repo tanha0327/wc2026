@@ -86,8 +86,44 @@ export const TOURNAMENT_START = new Date(
   process.env.TOURNAMENT_START_ISO || '2100-01-01T00:00:00.000Z'
 )
 
+export const FINAL_MATCH_START = new Date('2026-07-19T19:00:00.000Z')
+
 export function isTournamentStarted(): boolean {
   return new Date() >= TOURNAMENT_START
+}
+
+export function isScorerFinalized(): boolean {
+  return new Date() >= FINAL_MATCH_START
+}
+
+export function normalizeName(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+}
+
+function similarity(a: string, b: string): number {
+  if (!a || !b) return 0
+  const aBigrams = new Set<string>()
+  for (let i = 0; i < a.length - 1; i++) aBigrams.add(a.slice(i, i + 2))
+  const bBigrams = new Set<string>()
+  for (let i = 0; i < b.length - 1; i++) bBigrams.add(b.slice(i, i + 2))
+  if (aBigrams.size === 0 || bBigrams.size === 0) return a === b ? 1 : 0
+  const overlap = [...aBigrams].filter(x => bBigrams.has(x)).length
+  return (overlap * 2) / (aBigrams.size + bBigrams.size)
+}
+
+export function matchScorerName(predicted: string, actual: string): boolean {
+  const normalizedPredicted = normalizeName(predicted)
+  const normalizedActual = normalizeName(actual)
+
+  if (!normalizedPredicted || !normalizedActual) return false
+  if (normalizedPredicted === normalizedActual) return true
+  if (normalizedPredicted.includes(normalizedActual) || normalizedActual.includes(normalizedPredicted)) return true
+  return similarity(normalizedPredicted, normalizedActual) >= 0.72
 }
 
 export function normalizeScoreInput(value: string): string {
@@ -213,14 +249,25 @@ export function calcPoints(pred: Prediction, results: ActualResults | null): Poi
     rankPts += pts
   })
 
-  // 得点王は的中なら10pt。外れても、選んだ選手が得点したら1点1pt。
+  // 得点王は、決勝後の最終更新でのみ「的中」ボーナスを付与する。
+  // それまでは得点数分だけポイントを加算する。
   let scorerPts = 0
-  if (p.scorer?.name && results.scorer?.name) {
-    if (p.scorer.name === results.scorer.name) {
-      scorerPts = 10
-    } else {
-      const selected = results.scorers?.find(s => s.name === p.scorer.name)
-      if (selected) scorerPts = selected.goals
+  if (p.scorer?.name) {
+    const selected = (results.scorers || []).find(s => matchScorerName(p.scorer.name, s.name))
+      || (results.scorer && matchScorerName(p.scorer.name, results.scorer.name) ? results.scorer : null)
+
+    if (selected) {
+      const maxGoals = Math.max(
+        0,
+        ...(results.scorers || []).map(s => s.goals || 0),
+        results.scorer?.goals || 0,
+      )
+      const isTopScorer = maxGoals > 0 && selected.goals === maxGoals
+
+      scorerPts = selected.goals
+      if (isScorerFinalized() && isTopScorer) {
+        scorerPts = 10
+      }
     }
   }
 
@@ -264,7 +311,7 @@ export const SCORER_CANDIDATES: Array<{ name: string; note: string }> = [
   { name: 'フロリアン・ヴィルツ', note: 'ドイツ復活の旗手！' },
   { name: 'ジャマル・ムシアラ', note: '世界屈指のドリブラー！' },
   { name: 'アルダ・ギュレル', note: 'トルコの天才レフティー！' },
-  { name: 'ケナン・ユルディズ', note: '未来を担う新エース！' },
+  { name: 'ラウル・ヒメネス', note: 'ヘッドバンドのベテラン！' },
   { name: 'ジョアン・ペドロ', note: '覚醒期待の新星FW！' },
 ]
 
