@@ -3,6 +3,7 @@ import { ActualResults, JAPAN_MATCHES } from './data'
 const BASE = 'https://api.football-data.org/v4'
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY || ''
 const YAHOO_SCORER_URL = 'https://soccer.yahoo.co.jp/wcup/category/2026/stats?gk=18'
+const YAHOO_SCHEDULE_URL = 'https://soccer.yahoo.co.jp/wcup/category/2026/schedule'
 
 // football-data.org の 2026 W杯 competition id
 // 大会前は id=2000 (FIFA World Cup) で取得できる
@@ -155,6 +156,65 @@ async function fetchYahooScorers(): Promise<Array<{ name: string; goals: number 
   }
 }
 
+async function fetchYahooMatches(): Promise<Record<'j1' | 'j2' | 'j3', { japan: number; opponent: number; status: MatchResult['status'] } | undefined>> {
+  const result: Record<'j1' | 'j2' | 'j3', any> = { j1: undefined, j2: undefined, j3: undefined }
+
+  try {
+    const res = await fetch(YAHOO_SCHEDULE_URL, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 0 },
+    })
+
+    if (!res.ok) return result
+
+    const html = await res.text()
+
+    const rows = Array.from(html.matchAll(/<tr[^>]*class="[^"]*js-toggleModuleOff[^"]*"[^>]*>[\s\S]*?<\/tr>/gi))
+
+    for (const row of rows) {
+      const rowText = row[0]
+      if (!rowText.includes('日本')) continue
+
+      const dateMatch = rowText.match(/sc-tableGame__data--date["\']>([^<]+)/)
+      const scoreMatch = rowText.match(/sc-tableGame__scoreDetail["\']>[\s\S]*?(\d+)\s*-\s*(\d+)/)
+      const teams = Array.from(rowText.matchAll(/<a class="sc-tableGame__team"[^>]*>[\s\S]*?<span>([^<]+)<\/span>/gi))
+
+      if (!scoreMatch || teams.length < 2) continue
+
+      const team1Text = teams[0][1]
+      const team2Text = teams[1][1]
+      const score1 = Number.parseInt(scoreMatch[1])
+      const score2 = Number.parseInt(scoreMatch[2])
+
+      const isJapanFirst = team1Text.includes('日本')
+      const japanScore = isJapanFirst ? score1 : score2
+      const opponentScore = isJapanFirst ? score2 : score1
+      const opponent = isJapanFirst ? team2Text : team1Text
+
+      const matchDef = JAPAN_MATCHES.find(
+        m => m.opponent === opponent || 
+             m.opponentEn === opponent ||
+             m.opponent.includes(opponent) ||
+             opponent.includes(m.opponent)
+      )
+
+      if (matchDef) {
+        const key = matchDef.id as 'j1' | 'j2' | 'j3'
+        result[key] = {
+          japan: japanScore,
+          opponent: opponentScore,
+          status: rowText.includes('試合終了') ? 'FINISHED' : 'SCHEDULED',
+        }
+      }
+    }
+
+    return result
+  } catch (err) {
+    console.error('[fetchYahooMatches] error:', err)
+    return result
+  }
+}
+
 export async function fetchWCResults(): Promise<Partial<ActualResults>> {
   const result: Partial<ActualResults> = {
     matches: {},
@@ -164,7 +224,11 @@ export async function fetchWCResults(): Promise<Partial<ActualResults>> {
   }
 
   try {
-    // ① 日本の試合スコア取得
+    // ① 日本の試合スコア取得（Yahoo を優先）
+    const yahooMatches = await fetchYahooMatches()
+    Object.assign(result.matches, yahooMatches)
+
+    // football-data.org から日本戦を取得（Yahoo で取得できなかった場合のフォールバック）
     const matchesRes = await fetch(
       `${BASE}/competitions/${WC_ID}/matches?team=JPN&stage=GROUP_STAGE`,
       { headers, next: { revalidate: 0 } }
@@ -182,20 +246,24 @@ export async function fetchWCResults(): Promise<Partial<ActualResults>> {
         if (!matchDef) continue
 
         const key = matchDef.id as 'j1' | 'j2' | 'j3'
-        const home = fdMatch.score.fullTime.home
-        const away = fdMatch.score.fullTime.away
 
-        if (home !== null && away !== null) {
-          result.matches![key] = {
-            japan: isJapanHome ? home : away,
-            opponent: isJapanHome ? away : home,
-            status: fdMatch.status as MatchResult['status'],
-          }
-        } else {
-          result.matches![key] = {
-            japan: 0,
-            opponent: 0,
-            status: fdMatch.status as MatchResult['status'],
+        // Yahoo で取得できなかった場合のみ football-data のデータを使用
+        if (!result.matches![key]) {
+          const home = fdMatch.score.fullTime.home
+          const away = fdMatch.score.fullTime.away
+
+          if (home !== null && away !== null) {
+            result.matches![key] = {
+              japan: isJapanHome ? home : away,
+              opponent: isJapanHome ? away : home,
+              status: fdMatch.status as MatchResult['status'],
+            }
+          } else {
+            result.matches![key] = {
+              japan: 0,
+              opponent: 0,
+              status: fdMatch.status as MatchResult['status'],
+            }
           }
         }
       }
