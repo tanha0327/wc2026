@@ -28,5 +28,8 @@
     "eslint": "^8",
     "eslint-config-next": "^14.2.35",
     "typescript": "^5"
+  },
+  "overrides": {
+    "encoding-sniffer": "1.0.2"
   }
 }
