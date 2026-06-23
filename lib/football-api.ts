@@ -28,10 +28,13 @@ export interface MatchResult {
   status: 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'SUSPENDED' | 'POSTPONED'
 }
 
-async function fetchJapanMatches(): Promise<Record<'j1' | 'j2' | 'j3', MatchResult | undefined>> {
-  let browser = null
+async function fetchJapanMatches(
+  sharedBrowser?: any,
+): Promise<Record<'j1' | 'j2' | 'j3', MatchResult | undefined>> {
+  const ownsBrowser = !sharedBrowser
+  let browser: any = sharedBrowser ?? null
   try {
-    browser = await launchBrowser()
+    if (!browser) browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31457', {
       waitUntil: 'networkidle2',
@@ -92,14 +95,15 @@ async function fetchJapanMatches(): Promise<Record<'j1' | 'j2' | 'j3', MatchResu
     console.error('[puppeteer] fetchJapanMatches error:', err)
     return { j1: undefined, j2: undefined, j3: undefined }
   } finally {
-    if (browser) await browser.close()
+    if (ownsBrowser && browser) await browser.close()
   }
 }
 
-async function fetchTopScorer(): Promise<Array<{ name: string; goals: number }>> {
-  let browser = null
+async function fetchTopScorer(sharedBrowser?: any): Promise<Array<{ name: string; goals: number }>> {
+  const ownsBrowser = !sharedBrowser
+  let browser: any = sharedBrowser ?? null
   try {
-    browser = await launchBrowser()
+    if (!browser) browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/stats', {
       waitUntil: 'networkidle2',
@@ -147,14 +151,17 @@ async function fetchTopScorer(): Promise<Array<{ name: string; goals: number }>>
     console.error('[puppeteer] fetchTopScorer error:', err)
     return []
   } finally {
-    if (browser) await browser.close()
+    if (ownsBrowser && browser) await browser.close()
   }
 }
 
-async function fetchRankings(): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string | undefined>> {
-  let browser = null
+async function fetchRankings(
+  sharedBrowser?: any,
+): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string | undefined>> {
+  const ownsBrowser = !sharedBrowser
+  let browser: any = sharedBrowser ?? null
   try {
-    browser = await launchBrowser()
+    if (!browser) browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
       waitUntil: 'networkidle2',
@@ -222,14 +229,15 @@ async function fetchRankings(): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string
     console.error('[puppeteer] fetchRankings error:', err)
     return { r1: undefined, r2: undefined, r3: undefined, r4: undefined }
   } finally {
-    if (browser) await browser.close()
+    if (ownsBrowser && browser) await browser.close()
   }
 }
 
-async function fetchAdvancedTeams(): Promise<ActualResults['advancedTeams']> {
-  let browser = null
+async function fetchAdvancedTeams(sharedBrowser?: any): Promise<ActualResults['advancedTeams']> {
+  const ownsBrowser = !sharedBrowser
+  let browser: any = sharedBrowser ?? null
   try {
-    browser = await launchBrowser()
+    if (!browser) browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
       waitUntil: 'networkidle2',
@@ -292,38 +300,45 @@ async function fetchAdvancedTeams(): Promise<ActualResults['advancedTeams']> {
     console.error('[puppeteer] fetchAdvancedTeams error:', err)
     return { r32: [], r16: [], r8: [], r4plus: [] }
   } finally {
-    if (browser) await browser.close()
+    if (ownsBrowser && browser) await browser.close()
   }
 }
 
 export async function fetchWCResults(): Promise<Partial<ActualResults>> {
-  const [matches, scorers, rankings, advancedTeams] = await Promise.all([
-    fetchJapanMatches(),
-    fetchTopScorer(),
-    fetchRankings(),
-    fetchAdvancedTeams(),
-  ])
+  let browser: any = null
+  try {
+    browser = await launchBrowser()
 
-  // 名前のゆれを考慮した得点王マッチング
-  const topScorer = scorers[0]
-  let bestScorerMatch: { name: string; goals: number } | null = null
+    const [matches, scorers, rankings, advancedTeams] = await Promise.all([
+      fetchJapanMatches(browser),
+      fetchTopScorer(browser),
+      fetchRankings(browser),
+      fetchAdvancedTeams(browser),
+    ])
 
-  if (topScorer) {
-    // ネット上の得点王名とローカルの候補リストをマッチング
-    bestScorerMatch = {
-      name: topScorer.name,
-      goals: topScorer.goals,
+    // 名前のゆれを考慮した得点王マッチング
+    const topScorer = scorers[0]
+    let bestScorerMatch: { name: string; goals: number } | null = null
+
+    if (topScorer) {
+      // ネット上の得点王名とローカルの候補リストをマッチング
+      bestScorerMatch = {
+        name: topScorer.name,
+        goals: topScorer.goals,
+      }
     }
-  }
 
-  const result: Partial<ActualResults> = {
-    matches,
-    rankings,
-    advancedTeams,
-    scorer: bestScorerMatch || { name: '', goals: 0 },
-    scorers,
-    syncedAt: new Date().toISOString(),
-  }
+    const result: Partial<ActualResults> = {
+      matches,
+      rankings,
+      advancedTeams,
+      scorer: bestScorerMatch || { name: '', goals: 0 },
+      scorers,
+      syncedAt: new Date().toISOString(),
+    }
 
-  return result
+    return result
+  } finally {
+    if (browser) await browser.close()
+  }
 }
