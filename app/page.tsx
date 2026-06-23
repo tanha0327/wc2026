@@ -1,24 +1,35 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES } from '@/lib/data'
-
-const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
-const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
+import { JAPAN_MATCHES, TEAMS, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted, normalizeScoreInput } from '@/lib/data'
 
 export default function Home() {
-  const locked = isLocked()
+  const locked = isTournamentStarted()
   const [name, setName]     = useState('')
-  const [scores, setScores] = useState({ j1:[2,1] as [number,number], j2:[1,1] as [number,number], j3:[2,0] as [number,number] })
+  const [scores, setScores] = useState({ j1:[0,0] as [number,number], j2:[0,0] as [number,number], j3:[0,0] as [number,number] })
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
   const [scorer, setScorer] = useState({ name:'', goals: 0 })
   const [loading, setLoading] = useState(false)
+  const [teams, setTeams] = useState<string[]>(() => TEAMS)
   const [toast, setToast]   = useState<{type:'ok'|'err'|'lock', msg:string}|null>(null)
+  const groupedTeams = groupTeamsByDefinition(teams)
   const scorerCandidates = [...JAPAN_SCORER_CANDIDATES, ...SCORER_CANDIDATES]
   const [done, setDone]     = useState(false)
 
-  const setScore = (m: 'j1'|'j2'|'j3', idx: 0|1, v: string) =>
-    setScores(s => ({ ...s, [m]: s[m].map((x,i) => i===idx ? Math.max(0,parseInt(v)||0) : x) as [number,number] }))
+  const setScore = (m: 'j1'|'j2'|'j3', idx: 0|1, v: string) => {
+    const normalized = normalizeScoreInput(v)
+    setScores(s => ({
+      ...s,
+      [m]: s[m].map((x, i) => i === idx ? Math.min(20, Math.max(0, Number(normalized) || 0)) : x) as [number, number],
+    }))
+  }
+
+  useEffect(() => {
+    fetch('/api/teams')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => Array.isArray(data.teams) && setTeams(orderTeamsByGroupDefinition(data.teams)))
+      .catch(() => {})
+  }, [])
 
   const showToast = (type: 'ok'|'err'|'lock', msg: string) => {
     setToast({type, msg})
@@ -94,9 +105,9 @@ export default function Home() {
               <div className="match-row" key={m.id}>
                 <span className="match-date">{m.date}</span>
                 <span className="t-japan">日本</span>
-                <input className="score-in" type="number" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} disabled={locked} />
+                <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} disabled={locked} />
                 <span className="score-sep">—</span>
-                <input className="score-in" type="number" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} disabled={locked} />
+                <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} disabled={locked} />
                 <span className="t-opp">{m.opponent}</span>
               </div>
             )
@@ -114,14 +125,19 @@ export default function Home() {
                 <span className="rank-emoji">{e}</span>
                 <select value={rankings[k]} onChange={ev=>setRankings(r=>({...r,[k]:ev.target.value}))} disabled={locked}>
                   <option value="">選択</option>
-                  {TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                  {groupedTeams.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.teams.map(t => <option key={t} value={t}>{t}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
             ))}
           </div>
           <div className="pt-hint">
             1位一致 <strong>30pt</strong> ／ 2位 <strong>20pt</strong> ／ 3位 <strong>15pt</strong> ／ 4位 <strong>10pt</strong>
-            <br/>到達ボーナス: ベスト4以上 <strong>+5pt</strong> ／ ベスト8 <strong>+3pt</strong> ／ ベスト16 <strong>+1pt</strong>
+            <br/>到達ボーナス: ベスト8以上 <strong>+5pt</strong> ／ ベスト16 <strong>+3pt</strong> ／ ベスト32 <strong>+1pt</strong>
+            <br/>順位一致ポイントは到達ボーナスに加算されます。
           </div>
         </div>
 

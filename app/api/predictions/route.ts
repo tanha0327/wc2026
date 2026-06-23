@@ -3,6 +3,8 @@ import { getAdminDb } from '@/lib/firebase-admin'
 import { Prediction, PredictionVersion, isTournamentStarted, TOURNAMENT_START } from '@/lib/data'
 import { nanoid } from 'nanoid'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const db = getAdminDb()
   const snap = await db.collection('predictions').orderBy('createdAt', 'asc').get()
@@ -85,4 +87,21 @@ export async function POST(req: NextRequest) {
     await db.collection('predictions').doc(pred.id).set(pred)
     return NextResponse.json({ success: true, id: pred.id })
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')?.trim()
+  if (!id) {
+    return NextResponse.json({ error: 'id が必要です' }, { status: 400 })
+  }
+
+  const db = getAdminDb()
+  const docRef = db.collection('predictions').doc(id)
+  const snap = await docRef.get()
+  if (!snap.exists) {
+    return NextResponse.json({ error: '対象データが見つかりません' }, { status: 404 })
+  }
+
+  await docRef.delete()
+  return NextResponse.json({ success: true, id })
 }

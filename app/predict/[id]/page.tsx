@@ -2,10 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES } from '@/lib/data'
-
-const TOURNAMENT_START_CLIENT = new Date('2026-06-11T03:00:00.000Z')
-const isLocked = () => new Date() >= TOURNAMENT_START_CLIENT
+import { Prediction, ActualResults, calcPoints, JAPAN_MATCHES, TEAMS, PredictionVersion, SCORER_CANDIDATES, JAPAN_SCORER_CANDIDATES, groupTeamsByDefinition, orderTeamsByGroupDefinition, isTournamentStarted, normalizeScoreInput } from '@/lib/data'
 
 export default function PredictDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,14 +16,23 @@ export default function PredictDetailPage() {
   const [rankings, setRankings] = useState({ r1:'', r2:'', r3:'', r4:'' })
   const [scorer,   setScorer]   = useState({ name:'', goals: 0 })
   const [saving,   setSaving]   = useState(false)
+  const [teams,     setTeams]     = useState<string[]>(() => TEAMS)
   const scorerCandidates = [...JAPAN_SCORER_CANDIDATES, ...SCORER_CANDIDATES]
+  const groupedTeams = groupTeamsByDefinition(teams)
   const [toast,    setToast]    = useState<{type:'ok'|'err'|'lock', msg:string}|null>(null)
 
-  const locked = isLocked()
+  const locked = isTournamentStarted()
 
   const showToast = (type: 'ok'|'err'|'lock', msg: string) => {
     setToast({type,msg}); setTimeout(()=>setToast(null), 4000)
   }
+
+  useEffect(() => {
+    fetch('/api/teams')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => Array.isArray(data.teams) && setTeams(orderTeamsByGroupDefinition(data.teams)))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -51,8 +57,13 @@ export default function PredictDetailPage() {
     })
   }, [id])
 
-  const setScore = (m:'j1'|'j2'|'j3', idx:0|1, v:string) =>
-    setScores(s => ({...s, [m]: s[m].map((x,i)=>i===idx?Math.max(0,parseInt(v)||0):x) as [number,number]}))
+  const setScore = (m:'j1'|'j2'|'j3', idx:0|1, v:string) => {
+    const normalized = normalizeScoreInput(v)
+    setScores(s => ({
+      ...s,
+      [m]: s[m].map((x, i) => i === idx ? Math.min(20, Math.max(0, Number(normalized) || 0)) : x) as [number, number],
+    }))
+  }
 
   const save = async () => {
     if (!pred) return
@@ -209,9 +220,9 @@ export default function PredictDetailPage() {
                 <div className="match-row" key={m.id}>
                   <span className="match-date">{m.date}</span>
                   <span className="t-japan">日本</span>
-                  <input className="score-in" type="number" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} />
+                  <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[0]} onChange={e=>setScore(key,0,e.target.value)} />
                   <span className="score-sep">—</span>
-                  <input className="score-in" type="number" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} />
+                  <input className="score-in" type="text" inputMode="numeric" pattern="[0-9]*" min={0} max={20} value={s[1]} onChange={e=>setScore(key,1,e.target.value)} />
                   <span className="t-opp">{m.opponent}</span>
                 </div>
               )
@@ -224,7 +235,11 @@ export default function PredictDetailPage() {
                   <span className="rank-emoji">{e}</span>
                   <select value={rankings[k]} onChange={ev=>setRankings(r=>({...r,[k]:ev.target.value}))}>
                     <option value="">選択</option>
-                    {TEAMS.map(t=><option key={t} value={t}>{t}</option>)}
+                    {groupedTeams.map(group => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.teams.map(t => <option key={t} value={t}>{t}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
               ))}
