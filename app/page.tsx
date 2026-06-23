@@ -136,7 +136,8 @@ export default function Home() {
           </div>
           <div className="pt-hint">
             1位一致 <strong>30pt</strong> ／ 2位 <strong>20pt</strong> ／ 3位 <strong>15pt</strong> ／ 4位 <strong>10pt</strong>
-            <br/>到達ボーナス: ベスト4以上 <strong>+5pt</strong> ／ ベスト8 <strong>+3pt</strong> ／ ベスト16 <strong>+1pt</strong>
+            <br/>到達ボーナス: ベスト8以上 <strong>+5pt</strong> ／ ベスト16 <strong>+3pt</strong> ／ ベスト32 <strong>+1pt</strong>
+            <br/>順位一致ポイントは到達ボーナスに加算されます。
           </div>
         </div>
 
