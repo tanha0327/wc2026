@@ -1,4 +1,4 @@
-// File: /Users/sagawa/Documents/github/wc2026/app/api/teams/route.ts
+// File: /Users/taku/Documents/GitHub/wc2026_hanta/wc2026/app/api/teams/route.ts
 import * as entry from '../../../../../app/api/teams/route.js'
 import type { NextRequest } from 'next/server.js'
 

@@ -1,4 +1,4 @@
-// File: /Users/sagawa/Documents/github/wc2026/app/ranking/page.tsx
+// File: /Users/taku/Documents/GitHub/wc2026_hanta/wc2026/app/ranking/page.tsx
 import * as entry from '../../../../app/ranking/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

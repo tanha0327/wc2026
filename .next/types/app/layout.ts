@@ -1,4 +1,4 @@
-// File: /Users/sagawa/Documents/github/wc2026/app/layout.tsx
+// File: /Users/taku/Documents/GitHub/wc2026_hanta/wc2026/app/layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
