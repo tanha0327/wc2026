@@ -88,3 +88,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: pred.id })
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get('id')?.trim()
+  if (!id) {
+    return NextResponse.json({ error: 'id が必要です' }, { status: 400 })
+  }
+
+  const db = getAdminDb()
+  const docRef = db.collection('predictions').doc(id)
+  const snap = await docRef.get()
+  if (!snap.exists) {
+    return NextResponse.json({ error: '対象データが見つかりません' }, { status: 404 })
+  }
+
+  await docRef.delete()
+  return NextResponse.json({ success: true, id })
+}

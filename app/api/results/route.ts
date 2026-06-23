@@ -17,7 +17,7 @@ export async function GET() {
     const merged: ActualResults = {
       matches: fresh.matches || {},
       rankings: fresh.rankings || {},
-      advancedTeams: fresh.advancedTeams || { r16: [], r8: [], r4plus: [] },
+      advancedTeams: fresh.advancedTeams || { r32: [], r16: [], r8: [], r4plus: [] },
       scorer: fresh.scorer,
       scorers: fresh.scorers || [],
       syncedAt: new Date().toISOString(),

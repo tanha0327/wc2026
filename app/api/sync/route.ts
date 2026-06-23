@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminDb } from '@/lib/firebase-admin'
 import { fetchWCResults } from '@/lib/football-api'
-import { ActualResults, isTournamentStarted } from '@/lib/data'
+import { ActualResults, TEAMS, isTournamentStarted } from '@/lib/data'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,14 +17,25 @@ export async function GET() {
     // 既存データとマージ（手動入力分を上書きしない）
     const existingSnap = await db.doc(DOC_PATH).get()
     const existing = (existingSnap.exists ? existingSnap.data() : {}) as Partial<ActualResults>
+    const validTeamSet = new Set(TEAMS)
+    const sanitizeTeams = (teams?: string[]) => (teams || []).filter((t) => validTeamSet.has(t))
 
     const merged: ActualResults = {
       matches: { ...existing.matches, ...fresh.matches },
       rankings: { ...existing.rankings, ...fresh.rankings },
       advancedTeams: {
-        r16: fresh.advancedTeams?.r16?.length ? fresh.advancedTeams.r16 : (existing.advancedTeams?.r16 || []),
-        r8:  fresh.advancedTeams?.r8?.length  ? fresh.advancedTeams.r8  : (existing.advancedTeams?.r8  || []),
-        r4plus: fresh.advancedTeams?.r4plus?.length ? fresh.advancedTeams.r4plus : (existing.advancedTeams?.r4plus || []),
+        r32: sanitizeTeams(fresh.advancedTeams?.r32).length
+          ? sanitizeTeams(fresh.advancedTeams?.r32)
+          : sanitizeTeams(existing.advancedTeams?.r32),
+        r16: sanitizeTeams(fresh.advancedTeams?.r16).length
+          ? sanitizeTeams(fresh.advancedTeams?.r16)
+          : sanitizeTeams(existing.advancedTeams?.r16),
+        r8: sanitizeTeams(fresh.advancedTeams?.r8).length
+          ? sanitizeTeams(fresh.advancedTeams?.r8)
+          : sanitizeTeams(existing.advancedTeams?.r8),
+        r4plus: sanitizeTeams(fresh.advancedTeams?.r4plus).length
+          ? sanitizeTeams(fresh.advancedTeams?.r4plus)
+          : sanitizeTeams(existing.advancedTeams?.r4plus),
       },
       scorer: fresh.scorer || existing.scorer,
       scorers: fresh.scorers || existing.scorers || [],
