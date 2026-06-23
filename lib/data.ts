@@ -177,6 +177,7 @@ export interface ActualResults {
     r4?: string
   }
   advancedTeams: {
+    r32: string[]
     r16: string[]
     r8: string[]
     r4plus: string[]
@@ -236,14 +237,19 @@ export function calcPoints(pred: Prediction, results: ActualResults | null): Poi
     const predicted = p.rankings[key]
     const actual = results.rankings[key]
     if (!predicted) return
+    const { r32 = [], r16 = [], r8 = [], r4plus = [] } = results.advancedTeams
+
     let pts = 0
+    // 到達ボーナス（新ルール）
+    // ベスト8以上: +5 / ベスト16: +3 / ベスト32: +1
+    // 旧データ互換のため r4plus はベスト8以上として扱う
+    if (r8.includes(predicted) || r4plus.includes(predicted)) pts += 5
+    else if (r16.includes(predicted)) pts += 3
+    else if (r32.includes(predicted)) pts += 1
+
+    // 順位一致ポイントは到達ボーナスに加算
     if (predicted === actual) {
-      pts = rankMap[key]
-    } else {
-      const { r16, r8, r4plus } = results.advancedTeams
-      if (r4plus.includes(predicted)) pts = 5
-      else if (r8.includes(predicted)) pts = 3
-      else if (r16.includes(predicted)) pts = 1
+      pts += rankMap[key]
     }
     rankDetails[key] = pts
     rankPts += pts
@@ -283,36 +289,36 @@ export function calcPoints(pred: Prediction, results: ActualResults | null): Poi
 
 // 得点王候補（大会全体からの30名と日本専用10名）
 export const SCORER_CANDIDATES: Array<{ name: string; note: string }> = [
-  { name: 'キリアン・エムバペ', note: '得点王最有力候補！' },
-  { name: 'アーリング・ハーランド', note: '世界最強クラスの怪物！' },
-  { name: 'ハリー・ケイン', note: '得点王経験の絶対エース！' },
-  { name: 'クリスティアーノ・ロナウド', note: '伝説はまだ終わらない！' },
-  { name: 'ヴィニシウス・ジュニオール', note: 'ブラジルの超新エース！' },
-  { name: 'ラウタロ・マルティネス', note: '世界王者の主砲！' },
-  { name: 'フリアン・アルバレス', note: '勝負強さは世界屈指！' },
-  { name: 'ウスマン・デンベレ', note: '爆発力なら世界トップ級！' },
-  { name: 'ラミン・ヤマル', note: '世界を驚かす天才少年！' },
-  { name: 'ニコ・ウィリアムズ', note: '止められない快速アタッカー！' },
-  { name: 'ブカヨ・サカ', note: 'イングランドの得点源！' },
-  { name: 'コール・パーマー', note: '新時代のスター候補！' },
-  { name: 'ジュード・ベリンガム', note: 'ゴールも奪う万能MF！' },
+  { name: 'キリアン エムバペ', note: '得点王最有力候補！' },
+  { name: 'アーリング ハーランド', note: '世界最強クラスの怪物！' },
+  { name: 'ハリー ケイン', note: '得点王経験の絶対エース！' },
+  { name: 'クリスティアーノ ロナウド', note: '伝説はまだ終わらない！' },
+  { name: 'ヴィニシウス ジュニオール', note: 'ブラジルの超新エース！' },
+  { name: 'ラウタロ マルティネス', note: '世界王者の主砲！' },
+  { name: 'フリアン アルバレス', note: '勝負強さは世界屈指！' },
+  { name: 'ウスマン デンベレ', note: '爆発力なら世界トップ級！' },
+  { name: 'ラミン ヤマル', note: '世界を驚かす天才少年！' },
+  { name: 'ニコ ウィリアムズ', note: '止められない快速アタッカー！' },
+  { name: 'ブカヨ サカ', note: 'イングランドの得点源！' },
+  { name: 'コール パーマー', note: '新時代のスター候補！' },
+  { name: 'ジュード ベリンガム', note: 'ゴールも奪う万能MF！' },
   { name: 'ロドリゴ', note: '大舞台に強い点取り屋！' },
   { name: 'ラフィーニャ', note: '得点も演出も超一流！' },
   { name: 'ネイマール', note: '最後の輝きを見せるか！' },
-  { name: 'アレクサンデル・イサク', note: '北欧が誇る万能FW！' },
-  { name: 'ヴィクトル・ギェケレシュ', note: '欧州最強級の得点力！' },
-  { name: 'ヴィクター・オシムヘン', note: 'アフリカ最強ストライカー！' },
-  { name: 'ジョナサン・デイビッド', note: '開催地を沸かす主砲！' },
-  { name: 'モハメド・サラー', note: '世界屈指のレフティー！' },
-  { name: 'フヴィチャ・クヴァラツヘリア', note: 'ジョージアの至宝！' },
-  { name: 'ベンヤミン・シェシュコ', note: '次世代の怪物候補！' },
-  { name: 'セルー・ギラシ', note: '得点感覚は超一流！' },
-  { name: 'パトリック・シック', note: '一撃必殺のストライカー！' },
-  { name: 'フロリアン・ヴィルツ', note: 'ドイツ復活の旗手！' },
-  { name: 'ジャマル・ムシアラ', note: '世界屈指のドリブラー！' },
-  { name: 'アルダ・ギュレル', note: 'トルコの天才レフティー！' },
-  { name: 'ラウル・ヒメネス', note: 'ヘッドバンドのベテラン！' },
-  { name: 'ジョアン・ペドロ', note: '覚醒期待の新星FW！' },
+  { name: 'アレクサンデル イサク', note: '北欧が誇る万能FW！' },
+  { name: 'ヴィクトル ギェケレシュ', note: '欧州最強級の得点力！' },
+  { name: 'ヴィクター オシムヘン', note: 'アフリカ最強ストライカー！' },
+  { name: 'ジョナサン デイヴィッド', note: '開催地を沸かす主砲！' },
+  { name: 'モハメド サラー', note: '世界屈指のレフティー！' },
+  { name: 'フヴィチャ クヴァラツヘリア', note: 'ジョージアの至宝！' },
+  { name: 'ベンヤミン シェシュコ', note: '次世代の怪物候補！' },
+  { name: 'セルー ギラシ', note: '得点感覚は超一流！' },
+  { name: 'パトリック シック', note: '一撃必殺のストライカー！' },
+  { name: 'フロリアン ヴィルツ', note: 'ドイツ復活の旗手！' },
+  { name: 'ジャマル ムシアラ', note: '世界屈指のドリブラー！' },
+  { name: 'アルダ ギュレル', note: 'トルコの天才レフティー！' },
+  { name: 'ラウル ヒメネス', note: 'ヘッドバンドのベテラン！' },
+  { name: 'ジョアン ペドロ', note: '覚醒期待の新星FW！' },
 ]
 
 export const JAPAN_SCORER_CANDIDATES: Array<{ name: string; note: string }> = [
