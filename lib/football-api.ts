@@ -1,18 +1,25 @@
-import puppeteer from 'puppeteer'
 import { ActualResults, TEAMS } from './data'
-import Chromium from '@sparticuz/chromium'
 
-const getLaunchOptions = async () => {
-  if (process.env.VERCEL) {
-    return {
+const isServerlessRuntime = Boolean(
+  process.env.VERCEL || process.env.AWS_EXECUTION_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME,
+)
+
+const launchBrowser = async () => {
+  if (isServerlessRuntime) {
+    const [{ default: puppeteer }, { default: Chromium }] = await Promise.all([
+      import('puppeteer-core'),
+      import('@sparticuz/chromium'),
+    ])
+
+    return puppeteer.launch({
       args: Chromium.args,
       executablePath: await Chromium.executablePath(),
       headless: true,
-    }
+    })
   }
-  return {
-    headless: true,
-  }
+
+  const { default: puppeteer } = await import('puppeteer')
+  return puppeteer.launch({ headless: true })
 }
 
 export interface MatchResult {
@@ -24,8 +31,7 @@ export interface MatchResult {
 async function fetchJapanMatches(): Promise<Record<'j1' | 'j2' | 'j3', MatchResult | undefined>> {
   let browser = null
   try {
-    const options = await getLaunchOptions()
-    browser = await puppeteer.launch(options)
+    browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31457', {
       waitUntil: 'networkidle2',
@@ -93,8 +99,7 @@ async function fetchJapanMatches(): Promise<Record<'j1' | 'j2' | 'j3', MatchResu
 async function fetchTopScorer(): Promise<Array<{ name: string; goals: number }>> {
   let browser = null
   try {
-    const options = await getLaunchOptions()
-    browser = await puppeteer.launch(options)
+    browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/stats', {
       waitUntil: 'networkidle2',
@@ -149,8 +154,7 @@ async function fetchTopScorer(): Promise<Array<{ name: string; goals: number }>>
 async function fetchRankings(): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string | undefined>> {
   let browser = null
   try {
-    const options = await getLaunchOptions()
-    browser = await puppeteer.launch(options)
+    browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
       waitUntil: 'networkidle2',
@@ -225,8 +229,7 @@ async function fetchRankings(): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string
 async function fetchAdvancedTeams(): Promise<ActualResults['advancedTeams']> {
   let browser = null
   try {
-    const options = await getLaunchOptions()
-    browser = await puppeteer.launch(options)
+    browser = await launchBrowser()
     const page = await browser.newPage()
     await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
       waitUntil: 'networkidle2',
