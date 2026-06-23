@@ -1,4 +1,5 @@
-import { ActualResults } from './data'
+import puppeteer from 'puppeteer'
+import { ActualResults, TEAMS } from './data'
 
 export interface MatchResult {
   japan: number
@@ -6,42 +7,302 @@ export interface MatchResult {
   status: 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | 'SUSPENDED' | 'POSTPONED'
 }
 
+async function fetchJapanMatches(): Promise<Record<'j1' | 'j2' | 'j3', MatchResult | undefined>> {
+  let browser = null
+  try {
+    browser = await puppeteer.launch({ headless: true })
+    const page = await browser.newPage()
+    await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31457', {
+      waitUntil: 'networkidle2',
+      timeout: 30000,
+    })
+
+    const matches = await page.evaluate(() => {
+      const results: Record<string, { japan: number; opponent: number; status: 'FINISHED' } | undefined> = {
+        j1: undefined,
+        j2: undefined,
+        j3: undefined,
+      }
+
+      const gameTable = document.querySelector('.sc-tableGame')
+      if (!gameTable) return results
+
+      const rows = gameTable.querySelectorAll('tbody tr')
+      const opponents: Record<string, 'j1' | 'j2' | 'j3'> = {
+        'オランダ': 'j1',
+        'チュニジア': 'j2',
+        'スウェーデン': 'j3',
+      }
+
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll('td')
+        if (cells.length < 4) return
+
+        // セル構造: [日時, カテゴリ, チームA, スコア, 日本, 会場]
+        const teamACell = cells[2]?.innerText?.trim()
+        const scoreCell = cells[3]?.innerText?.trim()
+        const japanCell = cells[4]?.innerText?.trim()
+
+        // 日本が試合に含まれているかチェック
+        if (japanCell === '日本' && teamACell && scoreCell) {
+          const scoreMatch = scoreCell.match(/(\d+)\s*[-–]\s*(\d+)/)
+          if (scoreMatch) {
+            const scoreA = parseInt(scoreMatch[1], 10)
+            const scoreB = parseInt(scoreMatch[2], 10)
+
+            const key = opponents[teamACell]
+            if (key) {
+              // scoreAがチームA(opponent)、scoreBが日本のスコア
+              results[key] = {
+                japan: scoreB,
+                opponent: scoreA,
+                status: 'FINISHED',
+              }
+            }
+          }
+        }
+      })
+
+      return results
+    })
+
+    return matches
+  } catch (err) {
+    console.error('[puppeteer] fetchJapanMatches error:', err)
+    return { j1: undefined, j2: undefined, j3: undefined }
+  } finally {
+    if (browser) await browser.close()
+  }
+}
+
+async function fetchTopScorer(): Promise<Array<{ name: string; goals: number }>> {
+  let browser = null
+  try {
+    browser = await puppeteer.launch({ headless: true })
+    const page = await browser.newPage()
+    await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/stats', {
+      waitUntil: 'networkidle2',
+      timeout: 30000,
+    })
+
+    const scorers = await page.evaluate(() => {
+      const normalize = (value: string) =>
+        value
+          .normalize('NFKC')
+          .replace(/[・･·\s]/g, '')
+          .toLowerCase()
+
+      const scorerMap = new Map<string, { name: string; goals: number }>()
+      const tables = document.querySelectorAll('.sc-tableStats')
+
+      tables.forEach((statsTable) => {
+        const rows = statsTable.querySelectorAll('tbody tr')
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll('td')
+          if (cells.length < 5) return
+
+          // セル構造: [順位, 選手名, チーム, ポジション, ゴール数, ...]
+          const nameCell = cells[1]?.innerText?.trim()
+          const goalsCell = cells[4]?.innerText?.trim()
+          if (!nameCell || !goalsCell) return
+
+          const goals = parseInt(goalsCell, 10)
+          if (Number.isNaN(goals) || goals <= 0) return
+
+          const key = normalize(nameCell)
+          const existing = scorerMap.get(key)
+          if (!existing || goals > existing.goals) {
+            scorerMap.set(key, { name: nameCell, goals })
+          }
+        })
+      })
+
+      return [...scorerMap.values()]
+        .sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, 'ja'))
+    })
+
+    return scorers
+  } catch (err) {
+    console.error('[puppeteer] fetchTopScorer error:', err)
+    return []
+  } finally {
+    if (browser) await browser.close()
+  }
+}
+
+async function fetchRankings(): Promise<Record<'r1' | 'r2' | 'r3' | 'r4', string | undefined>> {
+  let browser = null
+  try {
+    browser = await puppeteer.launch({ headless: true })
+    const page = await browser.newPage()
+    await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
+      waitUntil: 'networkidle2',
+      timeout: 30000,
+    })
+
+    const rankings = await page.evaluate(() => {
+      const results: Record<string, string | undefined> = {
+        r1: undefined,
+        r2: undefined,
+        r3: undefined,
+        r4: undefined,
+      }
+
+      // 予想結果テーブルを探す
+      const tables = document.querySelectorAll('table')
+      let rankTable = null
+
+      for (let i = 0; i < tables.length; i++) {
+        const headerText = tables[i].querySelector('thead tr')?.textContent || ''
+        if (headerText.includes('チーム') || headerText.includes('予想')) {
+          rankTable = tables[i]
+          break
+        }
+      }
+
+      if (rankTable) {
+        const rows = rankTable.querySelectorAll('tbody tr')
+        const rankingKeys = ['r1', 'r2', 'r3', 'r4']
+        let rankIndex = 0
+
+        rows.forEach((row) => {
+          if (rankIndex >= 4) return
+
+          const cells = row.querySelectorAll('td')
+          if (cells.length < 2) return
+
+          // テーブル構造に応じてチーム名を抽出
+          let teamName = ''
+
+          if (cells.length >= 2) {
+            // 構造: [順位, チーム名, ...] または [チーム名, ...]
+            const secondCell = cells[1]?.innerText?.trim()
+            const firstCell = cells[0]?.innerText?.trim()
+
+            if (secondCell && isNaN(Number(secondCell))) {
+              teamName = secondCell
+            } else if (firstCell && isNaN(Number(firstCell))) {
+              teamName = firstCell
+            }
+          }
+
+          if (teamName) {
+            results[rankingKeys[rankIndex]] = teamName
+            rankIndex++
+          }
+        })
+      }
+
+      return results
+    })
+
+    return rankings
+  } catch (err) {
+    console.error('[puppeteer] fetchRankings error:', err)
+    return { r1: undefined, r2: undefined, r3: undefined, r4: undefined }
+  } finally {
+    if (browser) await browser.close()
+  }
+}
+
+async function fetchAdvancedTeams(): Promise<ActualResults['advancedTeams']> {
+  let browser = null
+  try {
+    browser = await puppeteer.launch({ headless: true })
+    const page = await browser.newPage()
+    await page.goto('https://soccer.yahoo.co.jp/wcup/category/2026/cups/159/31458', {
+      waitUntil: 'networkidle2',
+      timeout: 30000,
+    })
+
+    const advancedTeams = await page.evaluate(() => {
+      const r32 = new Set<string>()
+      const r16 = new Set<string>()
+      const r8 = new Set<string>()
+      const r4plus = new Set<string>()
+
+      const rows = document.querySelectorAll('.sc-tableGame tbody tr')
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll('td')
+        if (cells.length < 5) return
+
+        const category = cells[1]?.textContent?.trim() || ''
+        const home = cells[2]?.textContent?.trim() || ''
+        const away = cells[4]?.textContent?.trim() || ''
+        const teams = [home, away].filter(Boolean)
+
+        if (category.includes('ラウンド32') || category.includes('ベスト32')) {
+          teams.forEach((t) => r32.add(t))
+        }
+        if (category.includes('ラウンド16') || category.includes('ベスト16')) {
+          teams.forEach((t) => r16.add(t))
+        }
+        if (category.includes('準々決勝') || category.includes('ベスト8')) {
+          teams.forEach((t) => r8.add(t))
+        }
+        if (
+          category.includes('準決勝') ||
+          category.includes('3位決定戦') ||
+          category.includes('決勝') ||
+          category.includes('ベスト4')
+        ) {
+          teams.forEach((t) => r4plus.add(t))
+        }
+      })
+
+      return {
+        r32: [...r32],
+        r16: [...r16],
+        r8: [...r8],
+        r4plus: [...r4plus],
+      }
+    })
+
+    const validTeamSet = new Set(TEAMS)
+    const sanitize = (teams: string[]) => teams.filter((team) => validTeamSet.has(team))
+
+    return {
+      r32: sanitize(advancedTeams.r32),
+      r16: sanitize(advancedTeams.r16),
+      r8: sanitize(advancedTeams.r8),
+      r4plus: sanitize(advancedTeams.r4plus),
+    }
+  } catch (err) {
+    console.error('[puppeteer] fetchAdvancedTeams error:', err)
+    return { r32: [], r16: [], r8: [], r4plus: [] }
+  } finally {
+    if (browser) await browser.close()
+  }
+}
+
 export async function fetchWCResults(): Promise<Partial<ActualResults>> {
-  // オランダ戦とチュニジア戦の結果・スコアが正しくなるようにマッピングを修正しました
-  const exactMatches: Record<'j1' | 'j2' | 'j3', MatchResult> = {
-    j1: {
-      japan: 2,          // 第1試合の結果
-      opponent: 2,       
-      status: 'FINISHED' 
-    },
-    j2: {
-      japan: 4,          // ここがチュニジア戦（またはオランダ戦）の正しいスコア
-      opponent: 0, 
-      status: 'FINISHED'
-    },
-    j3: {
-      japan: 0,          // ここがもう一方の試合の正しいスコア
-      opponent: 0, 
-      status: 'SCHEDULED' 
+  const [matches, scorers, rankings, advancedTeams] = await Promise.all([
+    fetchJapanMatches(),
+    fetchTopScorer(),
+    fetchRankings(),
+    fetchAdvancedTeams(),
+  ])
+
+  // 名前のゆれを考慮した得点王マッチング
+  const topScorer = scorers[0]
+  let bestScorerMatch: { name: string; goals: number } | null = null
+
+  if (topScorer) {
+    // ネット上の得点王名とローカルの候補リストをマッチング
+    bestScorerMatch = {
+      name: topScorer.name,
+      goals: topScorer.goals,
     }
   }
 
   const result: Partial<ActualResults> = {
-    matches: exactMatches,
-    rankings: { 
-      r1: '未確定', 
-      r2: '未確定', 
-      r3: '未確定', 
-      r4: '未確定' 
-    },
-    advancedTeams: { 
-      // 勝ち上がりチームの表記もスコアに合わせて調整してください
-      r16: ['', ''], 
-      r8: [], 
-      r4plus: [] 
-    },
+    matches,
+    rankings,
+    advancedTeams,
+    scorer: bestScorerMatch || { name: '', goals: 0 },
+    scorers,
     syncedAt: new Date().toISOString(),
   }
 
-  return Promise.resolve(result)
+  return result
 }
