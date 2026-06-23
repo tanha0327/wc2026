@@ -17,6 +17,7 @@
     "nanoid": "^5.0.7",
     "next": "^14.2.35",
     "puppeteer": "^25.2.0",
+    "puppeteer-core": "^25.2.0",
     "react": "^18",
     "react-dom": "^18"
   },
@@ -27,5 +28,8 @@
     "eslint": "^8",
     "eslint-config-next": "^14.2.35",
     "typescript": "^5"
+  },
+  "overrides": {
+    "encoding-sniffer": "1.0.2"
   }
 }
