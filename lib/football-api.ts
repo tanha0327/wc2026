@@ -62,24 +62,29 @@ async function fetchJapanMatches(
         const cells = row.querySelectorAll('td')
         if (cells.length < 4) return
 
-        // セル構造: [日時, カテゴリ, チームA, スコア, 日本, 会場]
+        // セル構造: [日時, カテゴリ, チームA, スコア, チームB, 会場]
         const teamACell = cells[2]?.innerText?.trim()
         const scoreCell = cells[3]?.innerText?.trim()
-        const japanCell = cells[4]?.innerText?.trim()
+        const teamBCell = cells[4]?.innerText?.trim()
 
-        // 日本が試合に含まれているかチェック
-        if (japanCell === '日本' && teamACell && scoreCell) {
+        // 日本が左右どちら側でも拾えるようにする
+        if (teamACell && teamBCell && scoreCell) {
           const scoreMatch = scoreCell.match(/(\d+)\s*[-–]\s*(\d+)/)
           if (scoreMatch) {
             const scoreA = parseInt(scoreMatch[1], 10)
             const scoreB = parseInt(scoreMatch[2], 10)
 
-            const key = opponents[teamACell]
+            const isJapanHome = teamACell === '日本'
+            const isJapanAway = teamBCell === '日本'
+            if (!isJapanHome && !isJapanAway) return
+
+            const opponentName = isJapanHome ? teamBCell : teamACell
+            const key = opponents[opponentName]
             if (key) {
-              // scoreAがチームA(opponent)、scoreBが日本のスコア
+              // scoreAはチームA、scoreBはチームB
               results[key] = {
-                japan: scoreB,
-                opponent: scoreA,
+                japan: isJapanHome ? scoreA : scoreB,
+                opponent: isJapanHome ? scoreB : scoreA,
                 status: 'FINISHED',
               }
             }
